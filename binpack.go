@@ -1,3 +1,5 @@
+// Copyright (C) 2020 Michael J. Fromberger. All Rights Reserved.
+
 // Package binpack implements a compact binary encoding format.
 //
 // A binpack message is a concatenated sequence of tag-value records. A tag is
