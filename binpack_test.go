@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/creachadair/binpack"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestDecodeEmpty(t *testing.T) {
@@ -125,4 +126,49 @@ func capLen(s string) string {
 		return s[:maxLen-3] + "..."
 	}
 	return s
+}
+
+func TestMarshalRoundTrip(t *testing.T) {
+	type tag struct {
+		Key   string `binpack:"tag=1"`
+		Value int    `binpack:"tag=2"`
+	}
+	type thing struct {
+		Name   string `binpack:"tag=10"`
+		Tags   []*tag `binpack:"tag=20,pack"`
+		Foo    *tag   `binpack:"tag=40"`
+		Hot    bool   `binpack:"tag=30"`
+		Counts []int  `binpack:"tag=50"`
+
+		Set map[string]struct{} `binpack:"tag=60"`
+	}
+
+	in := &thing{
+		Name: "Harcourt Fenton Mudd",
+		Tags: []*tag{
+			{Key: "dalmatians", Value: 101},
+			{Key: "skeeziness", Value: 9001},
+		},
+		Foo: &tag{Key: "you are shit", Value: -15},
+		Hot: true,
+		Set: map[string]struct{}{
+			"horse": {},
+			"cake":  {},
+		},
+	}
+
+	bits, err := binpack.Marshal(in)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+	t.Logf("Marshal OK: %q", string(bits))
+
+	out := new(thing)
+	if err := binpack.Unmarshal(bits, out); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if diff := cmp.Diff(in, out); diff != "" {
+		t.Errorf("Unmarshal output differs (-want, +got):\n%s", diff)
+	}
 }
