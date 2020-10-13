@@ -47,9 +47,24 @@ package binpack
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 )
+
+// A Buffer wraps encoder that writes to a byte buffer. The caller can recover
+// the byte buffer from the Data field.
+type Buffer struct {
+	Data *bytes.Buffer
+	*Encoder
+}
+
+// NewBuffer constructs a new Buffer with the given data as its initial contents.
+// A Buffer wraps an Encoder that writes to a byte buffer.
+func NewBuffer(buf []byte) *Buffer {
+	data := bytes.NewBuffer(nil)
+	return &Buffer{Data: data, Encoder: NewEncoder(data)}
+}
 
 // An Encoder encodes tag-value records to an io.Writer.
 // Call the Encode method to add values. You must call Flush when finished to

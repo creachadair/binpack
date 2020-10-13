@@ -3,7 +3,6 @@
 package binpack_test
 
 import (
-	"bytes"
 	"io"
 	"strings"
 	"testing"
@@ -22,8 +21,7 @@ func TestDecodeEmpty(t *testing.T) {
 func TestEncodeSeveral(t *testing.T) {
 	input := []string{"cogwheel", "kiss", "failure", "x"}
 
-	var buf bytes.Buffer
-	e := binpack.NewEncoder(&buf)
+	e := binpack.NewBuffer(nil)
 
 	// Encode the inputs using their lengths as tags.
 	for _, s := range input {
@@ -37,12 +35,12 @@ func TestEncodeSeveral(t *testing.T) {
 
 	// Verify the binary format is right (hand-constructed).
 	const want = "\x08\x88cogwheel\x04\x84kiss\x07\x87failure\x01x"
-	if got := buf.String(); got != want {
+	if got := e.Data.String(); got != want {
 		t.Errorf("Encoded result: got %q, want %q", got, want)
 	}
 
 	// Verify we can get the original values back out, in order.
-	d := binpack.NewDecoder(&buf)
+	d := binpack.NewDecoder(e.Data)
 	for i := 0; ; i++ {
 		tag, value, err := d.Decode()
 		if err == io.EOF {
@@ -87,8 +85,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var buf bytes.Buffer
-		e := binpack.NewEncoder(&buf)
+		e := binpack.NewBuffer(nil)
 		if err := e.Encode(test.tag, []byte(test.value)); err != nil {
 			t.Errorf("Encode(%d, %q): unexpected error: %v", test.tag, capLen(test.value), err)
 			continue
@@ -96,14 +93,14 @@ func TestRoundTrip(t *testing.T) {
 			t.Errorf("Flush: unexpected error: %v", err)
 			continue
 		}
-		got := buf.String()
+		got := e.Data.String()
 		if got != test.want {
 			t.Errorf("Encode(%d, %q): got %q, want %q",
 				test.tag, capLen(test.value), capLen(got), capLen(test.want))
 		}
 
 		// Ensure we can round-trip the value.
-		d := binpack.NewDecoder(&buf)
+		d := binpack.NewDecoder(e.Data)
 		tag, value, err := d.Decode()
 		if err != nil {
 			t.Errorf("Decode failed: %v", err)
