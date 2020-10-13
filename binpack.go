@@ -159,7 +159,7 @@ func (d *Decoder) readTag() (int, error) {
 		}
 		return int(b&0x3f)<<8 | int(c), nil
 	default:
-		z, err := d.readInt(3)
+		z, err := d.readInt24()
 		if err != nil {
 			return 0, err
 		}
@@ -186,7 +186,7 @@ func (d *Decoder) readValue() ([]byte, error) {
 		}
 		n = int(b&0x1f)<<8 | int(c)
 	case 7: // 4 bytes after index
-		n, err = d.readInt(3)
+		n, err = d.readInt24()
 		if err != nil {
 			return nil, err
 		}
@@ -200,16 +200,12 @@ func (d *Decoder) readValue() ([]byte, error) {
 	return data, nil
 }
 
-// readInt reads the requested number of bytes from the input, and decodes its
-// value as an unsigned integer in big-endian order.
-func (d *Decoder) readInt(nBytes int) (int, error) {
-	buf := make([]byte, nBytes)
-	if _, err := io.ReadFull(d.buf, buf); err != nil {
+// readInt reads three bytes from the input and decodes the value as an
+// unsigned integer in big-endian order.
+func (d *Decoder) readInt24() (int, error) {
+	var buf [3]byte
+	if _, err := io.ReadFull(d.buf, buf[:]); err != nil {
 		return 0, err
 	}
-	var z int
-	for _, b := range buf {
-		z = (z << 8) | int(b)
-	}
-	return z, nil
+	return int(buf[0])<<16 | int(buf[1])<<8 | int(buf[2]), nil
 }
