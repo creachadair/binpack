@@ -28,7 +28,7 @@
 // The encoding of a value is as follows:
 //
 //   Byte 0 (index)
-//   +---------------+p
+//   +---------------+
 //   |0|   7 bits    | + 0 bytes         : length 1, value 0..127
 //   +---------------+
 //   |1|0| 6 bits    | + 0 bytes + data  : length 0..63
@@ -40,7 +40,7 @@
 //
 // The first byte of the value is called the index, and its high-order three
 // bits determine the size of the length prefix. Small single-byte values are
-// encoded directly with a prefix of 0; otherwise the length is 1, 3, or 5
+// encoded directly with a prefix of 0; otherwise the length is 1, 2, or 4
 // bytes.
 //
 package binpack
