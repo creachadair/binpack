@@ -50,6 +50,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // A Buffer wraps encoder that writes to a byte buffer. The caller can recover
@@ -70,12 +71,26 @@ func NewBuffer(buf []byte) *Buffer {
 // Call the Encode method to add values. You must call Flush when finished to
 // ensure all buffered output is written to the underlying writer.
 type Encoder struct {
-	buf *bufio.Writer
+	buf   bufWriter
+	flush func() error
 }
 
 // NewEncoder constructs an Encoder that writes data to w.
 func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{buf: bufio.NewWriter(w)}
+	var enc Encoder
+	switch t := w.(type) {
+	case *bytes.Buffer:
+		enc.buf = t
+		enc.flush = func() error { return nil }
+	case *bufio.Writer:
+		enc.buf = t
+		enc.flush = t.Flush
+	default:
+		buf := bufio.NewWriter(w)
+		enc.buf = buf
+		enc.flush = buf.Flush
+	}
+	return &enc
 }
 
 // Encode appends a single tag-value pair to the output.
@@ -88,10 +103,15 @@ func (e *Encoder) Encode(tag int, value []byte) error {
 }
 
 // Flush flushes buffered data to the underlying writer.
-func (e *Encoder) Flush() error { return e.buf.Flush() }
+func (e *Encoder) Flush() error { return e.flush() }
+
+type bufWriter interface {
+	io.Writer
+	io.ByteWriter
+}
 
 // writeTag appends the encoding of tag to w.
-func writeTag(w *bufio.Writer, tag int) (err error) {
+func writeTag(w bufWriter, tag int) (err error) {
 	if tag < 128 {
 		return w.WriteByte(byte(tag))
 	} else if tag < (1 << 14) {
@@ -107,7 +127,7 @@ func writeTag(w *bufio.Writer, tag int) (err error) {
 }
 
 // writeValue writes the encoding of value to w.
-func writeValue(w *bufio.Writer, value []byte) error {
+func writeValue(w bufWriter, value []byte) error {
 	n := len(value)
 	if n == 1 && value[0] < 128 {
 		return w.WriteByte(value[0])
@@ -136,31 +156,43 @@ func writeValue(w *bufio.Writer, value []byte) error {
 
 // A Decoder decodes tag-value pairs from an io.Reader.
 type Decoder struct {
-	buf *bufio.Reader
+	buf bufReader
 }
 
 // NewDecoder constructs a Decoder that reads records from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{buf: bufio.NewReader(r)}
+	switch t := r.(type) {
+	case *bytes.Buffer, *bytes.Reader, *strings.Reader:
+		return &Decoder{buf: t.(bufReader)}
+	case *bufio.Reader:
+		return &Decoder{buf: t}
+	default:
+		return &Decoder{buf: bufio.NewReader(r)}
+	}
 }
 
 // Decode returns the next tag-value record from the reader.
 // At the end of the input, it returns io.EOF.
 func (d *Decoder) Decode() (int, []byte, error) {
-	tag, err := d.readTag()
+	tag, err := readTag(d.buf)
 	if err != nil {
 		return 0, nil, err
 	}
-	value, err := d.readValue()
+	value, err := readValue(d.buf)
 	if err != nil {
 		return tag, nil, err
 	}
 	return tag, value, err
 }
 
+type bufReader interface {
+	io.Reader
+	io.ByteReader
+}
+
 // readTag reads a tag from the current position of the decoder.
-func (d *Decoder) readTag() (int, error) {
-	b, err := d.buf.ReadByte()
+func readTag(buf bufReader) (int, error) {
+	b, err := buf.ReadByte()
 	if err != nil {
 		return 0, err
 	}
@@ -168,13 +200,13 @@ func (d *Decoder) readTag() (int, error) {
 	case 0, 1:
 		return int(b), nil
 	case 2:
-		c, err := d.buf.ReadByte()
+		c, err := buf.ReadByte()
 		if err != nil {
 			return 0, err
 		}
 		return int(b&0x3f)<<8 | int(c), nil
 	default:
-		z, err := d.readInt24()
+		z, err := readInt24(buf)
 		if err != nil {
 			return 0, err
 		}
@@ -183,8 +215,8 @@ func (d *Decoder) readTag() (int, error) {
 }
 
 // readValue reads a value from the current position of the decoder.
-func (d *Decoder) readValue() ([]byte, error) {
-	b, err := d.buf.ReadByte()
+func readValue(buf bufReader) ([]byte, error) {
+	b, err := buf.ReadByte()
 	if err != nil {
 		return nil, err
 	}
@@ -195,13 +227,13 @@ func (d *Decoder) readValue() ([]byte, error) {
 	case 4, 5: // length in index byte
 		n = int(b & 0x3f)
 	case 6: // index + 2
-		c, err := d.buf.ReadByte()
+		c, err := buf.ReadByte()
 		if err != nil {
 			return nil, err
 		}
 		n = int(b&0x1f)<<8 | int(c)
 	case 7: // 4 bytes after index
-		n, err = d.readInt24()
+		n, err = readInt24(buf)
 		if err != nil {
 			return nil, err
 		}
@@ -209,18 +241,18 @@ func (d *Decoder) readValue() ([]byte, error) {
 
 	// Now n is the number of data bytes we need to read.
 	data := make([]byte, n)
-	if _, err := io.ReadFull(d.buf, data); err != nil {
+	if _, err := io.ReadFull(buf, data); err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-// readInt reads three bytes from the input and decodes the value as an
+// readInt24 reads three bytes from the input and decodes the value as an
 // unsigned integer in big-endian order.
-func (d *Decoder) readInt24() (int, error) {
-	var buf [3]byte
-	if _, err := io.ReadFull(d.buf, buf[:]); err != nil {
+func readInt24(buf bufReader) (int, error) {
+	var data [3]byte
+	if _, err := io.ReadFull(buf, data[:]); err != nil {
 		return 0, err
 	}
-	return int(buf[0])<<16 | int(buf[1])<<8 | int(buf[2]), nil
+	return int(data[0])<<16 | int(data[1])<<8 | int(data[2]), nil
 }
