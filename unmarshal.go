@@ -37,10 +37,10 @@ func Unmarshal(data []byte, v interface{}) error {
 		*t = b
 		return nil
 	case *[]byte:
-		*t = data
+		*t = copyOf(data)
 		return nil
 	case *interface{}:
-		*t = data
+		*t = copyOf(data)
 	case *string:
 		*t = string(data)
 		return nil
@@ -120,6 +120,12 @@ func unmarshalNumber(data []byte, v interface{}) (bool, error) {
 		return true, errors.New("invalid number encoding")
 	}
 	return true, nil
+}
+
+func copyOf(data []byte) []byte {
+	out := make([]byte, len(data))
+	copy(out, data)
+	return out
 }
 
 func newElement(etype reflect.Type) (reflect.Value, bool) {
