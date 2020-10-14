@@ -27,9 +27,9 @@ type BinpackMarshaler interface {
 //
 //     binpack:"tag=n"
 //
-// where n is an unsigned integer value. Fields of slice types (other than
-// []byte) are encoded inline, unless the "pack" attribute is also set, for
-// example:
+// where n is an unsigned integer value. Zero-valued fields are not encoded.
+// Fields of slice types other than []byte are encoded inline, unless the
+// "pack" attribute is also set, for example:
 //
 //     Names []string `binpack:"tag=24,pack"`
 //
