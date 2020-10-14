@@ -20,6 +20,9 @@ type BinpackUnmarshaler interface {
 // Unmarshal decodes data from binpack format into v.
 // If v implements BinpackUnmarshaler, its UnmarshalBinpack method is called.
 // Otherwise, if v implements encoding.BinaryUnmarshaler, that method is used.
+//
+// Because the binpack format does not record type information, unmarshaling
+// into an untyped interface will produce the input data unmodified.
 func Unmarshal(data []byte, v interface{}) error {
 	switch t := v.(type) {
 	case BinpackUnmarshaler:
@@ -36,6 +39,8 @@ func Unmarshal(data []byte, v interface{}) error {
 	case *[]byte:
 		*t = data
 		return nil
+	case *interface{}:
+		*t = data
 	case *string:
 		*t = string(data)
 		return nil
