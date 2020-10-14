@@ -122,6 +122,13 @@ func unmarshalNumber(data []byte, v interface{}) (bool, error) {
 	return true, nil
 }
 
+func newElement(etype reflect.Type) (reflect.Value, bool) {
+	if etype.Kind() == reflect.Ptr {
+		return reflect.New(etype.Elem()), true
+	}
+	return reflect.New(etype), false
+}
+
 // unmarshalSlice decodes into a slice from a packed array. The values are
 // appended to the current contents of val.
 // Precondition: val is a pointer to a reflect.Slice.
@@ -139,13 +146,6 @@ func unmarshalSlice(data []byte, val reflect.Value) error {
 	}
 
 	etype := val.Elem().Type().Elem()
-	isPtr := etype.Kind() == reflect.Ptr
-	newElement := func() reflect.Value {
-		if isPtr {
-			return reflect.New(etype.Elem())
-		}
-		return reflect.New(etype)
-	}
 	for {
 		next, err := readValue(buf)
 		if err == io.EOF {
@@ -154,7 +154,7 @@ func unmarshalSlice(data []byte, val reflect.Value) error {
 			return err
 		}
 
-		elt := newElement()
+		elt, isPtr := newElement(etype)
 		if err := Unmarshal(next, elt.Interface()); err != nil {
 			return err
 		}
@@ -269,11 +269,14 @@ func unmarshalStruct(data []byte, val reflect.Value) error {
 		if slc.IsNil() {
 			slc.Set(reflect.New(slc.Elem().Type()))
 		}
-		elt := reflect.New(slc.Elem().Type().Elem()) // zero of element type
+		elt, isPtr := newElement(slc.Elem().Type().Elem())
 		if err := Unmarshal(data, elt.Interface()); err != nil {
 			return err
 		}
-		slc.Elem().Set(reflect.Append(slc.Elem(), elt.Elem()))
+		if !isPtr {
+			elt = elt.Elem()
+		}
+		slc.Elem().Set(reflect.Append(slc.Elem(), elt))
 	}
 	return nil
 }

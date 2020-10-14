@@ -3,6 +3,7 @@
 package binpack_test
 
 import (
+	"bytes"
 	"io"
 	"strings"
 	"testing"
@@ -134,11 +135,12 @@ func TestMarshalRoundTrip(t *testing.T) {
 		Value int    `binpack:"tag=2"`
 	}
 	type thing struct {
-		Name   string `binpack:"tag=10"`
-		Tags   []*tag `binpack:"tag=20,pack"`
-		Foo    *tag   `binpack:"tag=40"`
-		Hot    bool   `binpack:"tag=30"`
-		Counts []int  `binpack:"tag=50"`
+		Name   string  `binpack:"tag=10"`
+		Tags   []*tag  `binpack:"tag=30"`
+		Slogan *tag    `binpack:"tag=20"`
+		Hot    bool    `binpack:"tag=70"`
+		Counts []int   `binpack:"tag=40,pack"`
+		Zero   float64 `binpack:"tag=15"`
 
 		Set map[string]struct{} `binpack:"tag=60"`
 	}
@@ -149,8 +151,9 @@ func TestMarshalRoundTrip(t *testing.T) {
 			{Key: "dalmatians", Value: 101},
 			{Key: "skeeziness", Value: 9001},
 		},
-		Foo: &tag{Key: "you are shit", Value: -15},
-		Hot: true,
+		Slogan: &tag{Key: "orange man bad", Value: -15},
+		Hot:    true,
+		Counts: []int{17, 69, 1814, 1918, 1936},
 		Set: map[string]struct{}{
 			"horse": {},
 			"cake":  {},
@@ -161,7 +164,18 @@ func TestMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal failed: %v", err)
 	}
-	t.Logf("Marshal OK: %q", string(bits))
+	t.Logf("Marshal OK, output is %d bytes", len(bits))
+	t.Logf("Output: %q", string(bits))
+	dec := binpack.NewDecoder(bytes.NewReader(bits))
+	for i := 0; ; i++ {
+		tag, data, err := dec.Decode()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			t.Fatalf("Decode failed: %v", err)
+		}
+		t.Logf("Record %d: tag=%d data=%q", i+1, tag, string(data))
+	}
 
 	out := new(thing)
 	if err := binpack.Unmarshal(bits, out); err != nil {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -35,6 +36,10 @@ type BinpackMarshaler interface {
 //
 // When "pack" is set, the slice is instead packed into a single value.  This
 // generally makes sense for small values.
+//
+// Note that map values are encoded in iteration order, which means that
+// marshaling a value that is or contains a map may not be deterministic.
+// Other than maps, however, the output is deterministic.
 func Marshal(v interface{}) ([]byte, error) {
 	switch t := v.(type) {
 	case BinpackMarshaler:
@@ -246,6 +251,16 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 			fi.target = field.Interface()
 		}
 		info = append(info, &fi)
+	}
+	sort.Slice(info, func(i, j int) bool {
+		return info[i].tag < info[j].tag
+	})
+
+	// Check for duplicate tags.
+	for i := 0; i < len(info)-1; i++ {
+		if info[i].tag == info[i+1].tag {
+			return nil, fmt.Errorf("duplicate field tag %d", info[i].tag)
+		}
 	}
 	return info, nil
 }
