@@ -21,6 +21,20 @@ type BinpackMarshaler interface {
 // Marshal encodes v as a binary value for a binpack tag-value pair.
 // If v implements BinpackMarshaler, its MarshalBinpack method is called.
 // Otherwise, if v implements encoding.BinaryMarshaler, that method is called.
+//
+// For struct types, Marshal uses field tags to select which exported fields
+// should be included and to assign them tag values. The tag format is:
+//
+//     binpack:"tag=n"
+//
+// where n is an unsigned integer value. Fields of slice types (other than
+// []byte) are encoded inline, unless the "pack" attribute is also set, for
+// example:
+//
+//     Names []string `binpack:"tag=24,pack"`
+//
+// When "pack" is set, the slice is instead packed into a single value.  This
+// generally makes sense for small values.
 func Marshal(v interface{}) ([]byte, error) {
 	switch t := v.(type) {
 	case BinpackMarshaler:
