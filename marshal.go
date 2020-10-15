@@ -186,11 +186,7 @@ func marshalStruct(val reflect.Value) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var buf bytes.Buffer
-	put := func(tag int, data []byte) {
-		writeTag(&buf, tag)
-		writeValue(&buf, data)
-	}
+	buf := NewBuffer(nil)
 
 	for _, fi := range info {
 		// Slice fields are flattened into the stream unless packed.
@@ -200,16 +196,16 @@ func marshalStruct(val reflect.Value) ([]byte, error) {
 				if err != nil {
 					return nil, fmt.Errorf("index %d: %w", i, err)
 				}
-				put(fi.tag, data)
+				buf.Encode(fi.tag, data)
 			}
 			continue
 		} else if data, err := Marshal(fi.target); err != nil {
 			return nil, err
 		} else {
-			put(fi.tag, data)
+			buf.Encode(fi.tag, data)
 		}
 	}
-	return buf.Bytes(), nil
+	return buf.Data.Bytes(), nil
 }
 
 // checkStructType extracts a field map from a struct type.
