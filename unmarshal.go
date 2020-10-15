@@ -58,10 +58,18 @@ func Unmarshal(data []byte, v interface{}) error {
 		return err
 	}
 	val := reflect.ValueOf(v)
-	if val.Type().Kind() != reflect.Ptr {
+	if typ := val.Type(); typ.Kind() != reflect.Ptr {
 		return fmt.Errorf("non-pointer %T cannot be unmarshaled", v)
 	} else if val.IsNil() {
 		return fmt.Errorf("cannot unmarshal into a nil %T", v)
+	} else if typ.Elem().Kind() == reflect.Ptr {
+		// Pointer-to-pointer.
+		p := reflect.New(typ.Elem().Elem())
+		if err := Unmarshal(data, p.Interface()); err != nil {
+			return err
+		}
+		val.Elem().Set(p)
+		return nil
 	}
 	if kind := val.Elem().Type().Kind(); kind == reflect.Slice {
 		return unmarshalSlice(data, val)
@@ -264,7 +272,7 @@ func unmarshalStruct(data []byte, val reflect.Value) error {
 		// Non-sequence.
 		if !fi.seq {
 			if err := Unmarshal(data, fi.target.Interface()); err != nil {
-				return nil
+				return err
 			}
 			continue
 		}

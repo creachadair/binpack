@@ -248,12 +248,7 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 		kind := field.Kind()
 		fi.seq = kind == reflect.Slice || kind == reflect.Map
 		if withPointer {
-			// If the caller wants a writable value, ensure the target is a pointer.
-			if field.Kind() == reflect.Ptr {
-				p := reflect.New(field.Type().Elem())
-				field.Set(p)
-				fi.target = p
-			} else if !field.CanAddr() {
+			if !field.CanAddr() {
 				return nil, fmt.Errorf("field %q cannot be addressed", ftype.Name)
 			} else {
 				fi.target = field.Addr()

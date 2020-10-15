@@ -138,6 +138,7 @@ func TestMarshalRoundTrip(t *testing.T) {
 		Name   string   `binpack:"tag=10"`
 		Tags   []*tag   `binpack:"tag=30"`
 		Slogan *tag     `binpack:"tag=20"`
+		Empty  *tag     `binpack:"tag=25"`
 		Hot    bool     `binpack:"tag=70"`
 		Counts []int    `binpack:"tag=40,pack"`
 		Zero   float64  `binpack:"tag=15"`
