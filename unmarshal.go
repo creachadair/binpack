@@ -263,12 +263,12 @@ func unmarshalStruct(data []byte, val reflect.Value) error {
 
 		// Non-sequence.
 		if !fi.seq {
-			if err := Unmarshal(data, fi.target); err != nil {
+			if err := Unmarshal(data, fi.target.Interface()); err != nil {
 				return nil
 			}
 			continue
 		}
-		slc := reflect.ValueOf(fi.target)
+		slc := fi.target
 		kind := slc.Type().Elem().Kind()
 
 		// Packed sequence.

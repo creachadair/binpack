@@ -204,15 +204,23 @@ func marshalStruct(val reflect.Value) ([]byte, error) {
 	for _, fi := range info {
 		// Slice fields are flattened into the stream unless packed.
 		if fi.seq && !fi.pack {
-			for i, elt := range fi.target.([][]byte) {
-				data, err := Marshal(elt)
-				if err != nil {
-					return nil, fmt.Errorf("index %d: %w", i, err)
-				}
-				buf.Encode(fi.tag, data)
+			var vals [][]byte
+			switch fi.target.Kind() {
+			case reflect.Slice:
+				vals, err = packSlice(fi.target)
+			case reflect.Map:
+				vals, err = packMap(fi.target)
+			default:
+				panic("invalid sequence type")
+			}
+			if err != nil {
+				return nil, err
+			}
+			for _, elt := range vals {
+				buf.Encode(fi.tag, elt)
 			}
 			continue
-		} else if data, err := Marshal(fi.target); err != nil {
+		} else if data, err := Marshal(fi.target.Interface()); err != nil {
 			return nil, err
 		} else {
 			buf.Encode(fi.tag, data)
@@ -244,36 +252,20 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 			if field.Kind() == reflect.Ptr {
 				p := reflect.New(field.Type().Elem())
 				field.Set(p)
-				fi.target = p.Interface()
+				fi.target = p
 			} else if !field.CanAddr() {
 				return nil, fmt.Errorf("field %q cannot be addressed", ftype.Name)
 			} else {
-				fi.target = field.Addr().Interface()
+				fi.target = field.Addr()
 			}
 
 		} else if field.IsZero() {
 			// The caller is encoding; skip zero values.
 			continue
 
-		} else if kind == reflect.Slice {
-			// The caller is encoding; package slice values into a slice.
-			vals, err := packSlice(field)
-			if err != nil {
-				return nil, err
-			}
-			fi.target = vals
-
-		} else if kind == reflect.Map {
-			// The caller is encoding; package map entries into a slice.
-			vals, err := packMap(field)
-			if err != nil {
-				return nil, err
-			}
-			fi.target = vals
-
 		} else {
 			// THe caller is encoding; this is a singleton.
-			fi.target = field.Interface()
+			fi.target = field
 		}
 		info = append(info, &fi)
 	}
@@ -291,10 +283,13 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 }
 
 type fieldInfo struct {
-	tag    int  // field tag
-	seq    bool // value is a sequence (slice or map)
-	pack   bool // use packed encoding
-	target interface{}
+	tag  int  // field tag
+	seq  bool // value is a sequence (slice or map)
+	pack bool // use packed encoding
+
+	// The field value, if withPointer=false (marshal).
+	// A pointer to the field value, if withPointer=true (unmarshal).
+	target reflect.Value
 }
 
 func parseTag(s string) (fieldInfo, bool) {
