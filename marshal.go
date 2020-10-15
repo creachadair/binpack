@@ -131,12 +131,10 @@ func deref(v interface{}) (bool, reflect.Value) {
 	return false, val
 }
 
-// marshalSlice encodes a slice as a single tag-value pair whose tag is the
-// length of the slice and value is the concatenation of its encoded values.
+// marshalSlice encodes a slice as a concatenated sequence of values.
 // Precondition: val is a reflect.Slice.
 func marshalSlice(val reflect.Value) ([]byte, error) {
 	var buf bytes.Buffer
-	writeTag(&buf, val.Len())
 	for i := 0; i < val.Len(); i++ {
 		cur := val.Index(i).Interface()
 		data, err := Marshal(cur)
@@ -148,13 +146,11 @@ func marshalSlice(val reflect.Value) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// marshalMap encodes a map as a single tag-value pair whose tag is the number
-// of entries in the map and value is the concatenation of its encoded
-// key/value pairs in consecutive order.
+// marshalMap encodes a map as a concatenated sequence of key-value pairs.
+// Note that iteration order affects the output, and may vary.
 // Precondition: val is a reflect.Map.
 func marshalMap(val reflect.Value) ([]byte, error) {
 	var buf bytes.Buffer
-	writeTag(&buf, val.Len())
 	for _, key := range val.MapKeys() {
 		data, err := Marshal(key.Interface())
 		if err != nil {

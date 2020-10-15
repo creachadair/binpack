@@ -143,14 +143,6 @@ func unmarshalSlice(data []byte, val reflect.Value) error {
 		val.Set(reflect.New(val.Elem().Type()))
 	}
 	buf := bytes.NewReader(data)
-	size, err := readTag(buf)
-	if err != nil {
-		return fmt.Errorf("invalid array size: %w", err)
-	}
-	if val.Elem().Len() == 0 {
-		val.Elem().Set(reflect.MakeSlice(val.Elem().Type(), 0, size))
-	}
-
 	etype := val.Elem().Type().Elem()
 	for {
 		next, err := readValue(buf)
@@ -168,10 +160,6 @@ func unmarshalSlice(data []byte, val reflect.Value) error {
 			elt = elt.Elem()
 		}
 		val.Elem().Set(reflect.Append(val.Elem(), elt))
-		size--
-	}
-	if size != 0 {
-		return errors.New("invalid packed array")
 	}
 	return nil
 }
@@ -183,15 +171,11 @@ func unmarshalMap(data []byte, val reflect.Value) error {
 	if val.IsNil() {
 		val.Set(reflect.New(mtype))
 	}
-	buf := bytes.NewReader(data)
-	size, err := readTag(buf)
-	if err != nil {
-		return fmt.Errorf("invalid map size: %w", err)
-	}
-	if val.Elem().Len() == 0 {
-		val.Elem().Set(reflect.MakeMapWithSize(mtype, size))
+	if val.Elem().IsNil() {
+		val.Elem().Set(reflect.MakeMap(mtype))
 	}
 
+	buf := bytes.NewReader(data)
 	ktype := mtype.Key()
 	vtype := mtype.Elem()
 	for {
@@ -217,10 +201,6 @@ func unmarshalMap(data []byte, val reflect.Value) error {
 			return fmt.Errorf("decoding map value: %w", err)
 		}
 		val.Elem().SetMapIndex(mkey.Elem(), mval.Elem())
-		size--
-	}
-	if size != 0 {
-		return errors.New("invalid packed map")
 	}
 	return nil
 }

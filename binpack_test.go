@@ -186,3 +186,22 @@ func TestMarshalRoundTrip(t *testing.T) {
 		t.Errorf("Unmarshal output differs (-want, +got):\n%s", diff)
 	}
 }
+
+func TestUnmarshalPacked(t *testing.T) {
+	// This input mixes packed and unpacked values. Verify that the decoding
+	// them correctly combines the two forms.
+	//
+	//              /-- unpacked values--\ /-- packed values -\
+	//             [  1   ][  2   ][  3   ][          4   5   6]
+	const input = "\x0A\x02\x0A\x04\x0A\x06\x0A\x83\x08\x0A\x0C"
+	var v struct {
+		V []int `binpack:"tag=10,pack"`
+	}
+	if err := binpack.Unmarshal([]byte(input), &v); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	want := []int{1, 2, 3, 4, 5, 6}
+	if diff := cmp.Diff(want, v.V); diff != "" {
+		t.Errorf("Unmarshal output (-want, +got):\n%s", diff)
+	}
+}
