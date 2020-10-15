@@ -135,12 +135,13 @@ func TestMarshalRoundTrip(t *testing.T) {
 		Value int    `binpack:"tag=2"`
 	}
 	type thing struct {
-		Name   string  `binpack:"tag=10"`
-		Tags   []*tag  `binpack:"tag=30"`
-		Slogan *tag    `binpack:"tag=20"`
-		Hot    bool    `binpack:"tag=70"`
-		Counts []int   `binpack:"tag=40,pack"`
-		Zero   float64 `binpack:"tag=15"`
+		Name   string   `binpack:"tag=10"`
+		Tags   []*tag   `binpack:"tag=30"`
+		Slogan *tag     `binpack:"tag=20"`
+		Hot    bool     `binpack:"tag=70"`
+		Counts []int    `binpack:"tag=40,pack"`
+		Zero   float64  `binpack:"tag=15"`
+		More   []*thing `binpack:"tag=170"`
 
 		Set map[string]struct{} `binpack:"tag=60"`
 	}
@@ -158,6 +159,15 @@ func TestMarshalRoundTrip(t *testing.T) {
 			"horse": {},
 			"cake":  {},
 		},
+		More: []*thing{{
+			Name:   "The Devil",
+			Slogan: &tag{Key: "burn"},
+			Zero:   3.14159,
+		}, {
+			Name:   "The Angel",
+			Slogan: &tag{Key: "fly"},
+			Hot:    false,
+		}},
 	}
 
 	bits, err := binpack.Marshal(in)
@@ -174,7 +184,7 @@ func TestMarshalRoundTrip(t *testing.T) {
 		} else if err != nil {
 			t.Fatalf("Decode failed: %v", err)
 		}
-		t.Logf("Record %d: tag=%d data=%q", i+1, tag, string(data))
+		t.Logf("Record %d: len=%d tag=%d data=%q", i+1, len(data), tag, string(data))
 	}
 
 	out := new(thing)
