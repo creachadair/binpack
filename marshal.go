@@ -14,14 +14,15 @@ import (
 	"strings"
 )
 
-// A BinpackMarshaler encodes a value for use as a binpack value.
-type BinpackMarshaler interface {
+// A Marshaler encodes a value into an array of bytes for use in a binpack
+// tag-value pair.
+type Marshaler interface {
 	MarshalBinpack() ([]byte, error)
 }
 
 // Marshal encodes v as a binary value for a binpack tag-value pair.
-// If v implements BinpackMarshaler, its MarshalBinpack method is called.
-// Otherwise, if v implements encoding.BinaryMarshaler, that method is called.
+// If v implements Marshaler, its MarshalBinpack method is called.  Otherwise,
+// if v implements encoding.BinaryMarshaler, that method is called.
 //
 // For struct types, Marshal uses field tags to select which exported fields
 // should be included and to assign them tag values. The tag format is:
@@ -42,7 +43,7 @@ type BinpackMarshaler interface {
 // Other than maps, however, the output is deterministic.
 func Marshal(v interface{}) ([]byte, error) {
 	switch t := v.(type) {
-	case BinpackMarshaler:
+	case Marshaler:
 		return t.MarshalBinpack()
 	case encoding.BinaryMarshaler:
 		return t.MarshalBinary()
