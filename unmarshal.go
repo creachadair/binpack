@@ -191,8 +191,8 @@ func unpackEntry(entry []byte, val reflect.Value) error {
 	if err != nil {
 		return fmt.Errorf("map value: %w", err)
 	}
-	if _, err := readValue(ebuf); err != io.EOF {
-		return errors.New("extra data in map entry")
+	if v, err := readValue(ebuf); err != io.EOF {
+		return fmt.Errorf("extra data in map entry: %q", string(v))
 	}
 	mkey := reflect.New(ktype)
 	if err := Unmarshal(kdata, mkey.Interface()); err != nil {
