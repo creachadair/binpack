@@ -271,7 +271,6 @@ func unmarshalStruct(data []byte, val reflect.Value) error {
 		slc := reflect.ValueOf(fi.target)
 		kind := slc.Type().Elem().Kind()
 
-		// Unpacked sequence element
 		// Packed sequence.
 		if fi.pack {
 			switch kind {
