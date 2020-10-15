@@ -134,46 +134,62 @@ func deref(v interface{}) (bool, reflect.Value) {
 // marshalSlice encodes a slice as a concatenated sequence of values.
 // Precondition: val is a reflect.Slice.
 func marshalSlice(val reflect.Value) ([]byte, error) {
+	vals, err := packSlice(val)
+	if err != nil {
+		return nil, err
+	}
 	var buf bytes.Buffer
+	for _, elt := range vals {
+		writeValue(&buf, elt)
+	}
+	return buf.Bytes(), nil
+}
+
+// packSlice encodes a slice into a slice of byte records.
+// Precondition: val is a reflect.Slice.
+func packSlice(val reflect.Value) ([][]byte, error) {
+	var vals [][]byte
 	for i := 0; i < val.Len(); i++ {
 		cur := val.Index(i).Interface()
 		data, err := Marshal(cur)
 		if err != nil {
 			return nil, fmt.Errorf("marshaling index %d: %w", i, err)
 		}
-		writeValue(&buf, data)
+		vals = append(vals, data)
 	}
-	return buf.Bytes(), nil
+	return vals, nil
 }
 
 // marshalMap encodes a map as a concatenated sequence of key-value pairs.
 // Note that iteration order affects the output, and may vary.
 // Precondition: val is a reflect.Map.
 func marshalMap(val reflect.Value) ([]byte, error) {
-	var buf bytes.Buffer
-	for _, key := range val.MapKeys() {
-		data, err := Marshal(key.Interface())
-		if err != nil {
-			return nil, err
-		}
-		writeValue(&buf, data)
-		kval := val.MapIndex(key)
-		switch kval.Type().Kind() {
-		case reflect.Ptr, reflect.Interface:
-			if kval.IsNil() {
-				data = []byte{0}
-				break
-			}
-			fallthrough
-		default:
-			data, err = Marshal(kval.Interface())
-		}
-		if err != nil {
-			return nil, fmt.Errorf("got here: %v", err)
-		}
-		writeValue(&buf, data)
+	vals, err := packMap(val)
+	if err != nil {
+		return nil, err
 	}
-	return buf.Bytes(), nil
+	return marshalSlice(reflect.ValueOf(vals))
+}
+
+// packMap encodes a map as a slice of byte records.
+// Precondition: val is a reflect.Map.
+func packMap(val reflect.Value) ([][]byte, error) {
+	var vals [][]byte
+	for _, key := range val.MapKeys() {
+		var buf bytes.Buffer
+		if bits, err := Marshal(key.Interface()); err != nil {
+			return nil, err
+		} else {
+			writeValue(&buf, bits)
+		}
+		if bits, err := Marshal(val.MapIndex(key).Interface()); err != nil {
+			return nil, err
+		} else {
+			writeValue(&buf, bits)
+		}
+		vals = append(vals, buf.Bytes())
+	}
+	return vals, nil
 }
 
 // marshalStruct encodes a struct as a sequence of tag-value pairs.
@@ -187,8 +203,8 @@ func marshalStruct(val reflect.Value) ([]byte, error) {
 
 	for _, fi := range info {
 		// Slice fields are flattened into the stream unless packed.
-		if fi.slice && !fi.pack {
-			for i, elt := range fi.target.([]interface{}) {
+		if fi.seq && !fi.pack {
+			for i, elt := range fi.target.([][]byte) {
 				data, err := Marshal(elt)
 				if err != nil {
 					return nil, fmt.Errorf("index %d: %w", i, err)
@@ -221,8 +237,10 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 		}
 
 		field := val.Field(i)
-		fi.slice = field.Kind() == reflect.Slice
+		kind := field.Kind()
+		fi.seq = kind == reflect.Slice || kind == reflect.Map
 		if withPointer {
+			// If the caller wants a writable value, ensure the target is a pointer.
 			if field.Kind() == reflect.Ptr {
 				p := reflect.New(field.Type().Elem())
 				field.Set(p)
@@ -232,15 +250,29 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 			} else {
 				fi.target = field.Addr().Interface()
 			}
+
 		} else if field.IsZero() {
+			// The caller is encoding; skip zero values.
 			continue
-		} else if fi.slice {
-			var vals []interface{}
-			for i := 0; i < field.Len(); i++ {
-				vals = append(vals, field.Index(i).Interface())
+
+		} else if kind == reflect.Slice {
+			// The caller is encoding; package slice values into a slice.
+			vals, err := packSlice(field)
+			if err != nil {
+				return nil, err
 			}
 			fi.target = vals
+
+		} else if kind == reflect.Map {
+			// The caller is encoding; package map entries into a slice.
+			vals, err := packMap(field)
+			if err != nil {
+				return nil, err
+			}
+			fi.target = vals
+
 		} else {
+			// THe caller is encoding; this is a singleton.
 			fi.target = field.Interface()
 		}
 		info = append(info, &fi)
@@ -259,9 +291,9 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 }
 
 type fieldInfo struct {
-	tag    int
-	slice  bool
-	pack   bool
+	tag    int  // field tag
+	seq    bool // value is a sequence (slice or map)
+	pack   bool // use packed encoding
 	target interface{}
 }
 

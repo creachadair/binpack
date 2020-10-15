@@ -142,7 +142,7 @@ func TestMarshalRoundTrip(t *testing.T) {
 		Counts []int   `binpack:"tag=40,pack"`
 		Zero   float64 `binpack:"tag=15"`
 
-		Set map[string]struct{} `binpack:"tag=60"`
+		Set map[string]struct{} `binpack:"tag=60,pack"`
 	}
 
 	in := &thing{

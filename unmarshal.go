@@ -135,15 +135,29 @@ func newElement(etype reflect.Type) (reflect.Value, bool) {
 	return reflect.New(etype), false
 }
 
+// unpackElement decodes a single value and appends it to a slice.
+// Precondition: val is a pointer to a reflect.Slice.
+func unpackElement(element []byte, val reflect.Value) error {
+	if val.IsZero() {
+		val.Set(reflect.New(val.Elem().Type()))
+	}
+	etype := val.Elem().Type().Elem()
+	elt, isPtr := newElement(etype)
+	if err := Unmarshal(element, elt.Interface()); err != nil {
+		return err
+	}
+	if !isPtr {
+		elt = elt.Elem()
+	}
+	val.Elem().Set(reflect.Append(val.Elem(), elt))
+	return nil
+}
+
 // unmarshalSlice decodes into a slice from a packed array. The values are
 // appended to the current contents of val.
 // Precondition: val is a pointer to a reflect.Slice.
 func unmarshalSlice(data []byte, val reflect.Value) error {
-	if val.IsZero() {
-		val.Set(reflect.New(val.Elem().Type()))
-	}
 	buf := bytes.NewReader(data)
-	etype := val.Elem().Type().Elem()
 	for {
 		next, err := readValue(buf)
 		if err == io.EOF {
@@ -151,16 +165,44 @@ func unmarshalSlice(data []byte, val reflect.Value) error {
 		} else if err != nil {
 			return err
 		}
-
-		elt, isPtr := newElement(etype)
-		if err := Unmarshal(next, elt.Interface()); err != nil {
+		if err := unpackElement(next, val); err != nil {
 			return err
 		}
-		if !isPtr {
-			elt = elt.Elem()
-		}
-		val.Elem().Set(reflect.Append(val.Elem(), elt))
 	}
+	return nil
+}
+
+// unpackEntry decodes an entry and adds the key/value pair to val.
+// Precondition: val is a pointer to a reflect.Value.
+func unpackEntry(entry []byte, val reflect.Value) error {
+	out := val.Elem()
+	if out.IsNil() {
+		out.Set(reflect.MakeMap(out.Type()))
+	}
+	ktype := out.Type().Key()
+	vtype := out.Type().Elem()
+
+	ebuf := bytes.NewReader(entry)
+	kdata, err := readValue(ebuf)
+	if err != nil {
+		return fmt.Errorf("map key: %w", err)
+	}
+	vdata, err := readValue(ebuf)
+	if err != nil {
+		return fmt.Errorf("map value: %w", err)
+	}
+	if _, err := readValue(ebuf); err != io.EOF {
+		return errors.New("extra data in map entry")
+	}
+	mkey := reflect.New(ktype)
+	if err := Unmarshal(kdata, mkey.Interface()); err != nil {
+		return err
+	}
+	mval := reflect.New(vtype)
+	if err := Unmarshal(vdata, mval.Interface()); err != nil {
+		return err
+	}
+	out.SetMapIndex(mkey.Elem(), mval.Elem())
 	return nil
 }
 
@@ -176,31 +218,16 @@ func unmarshalMap(data []byte, val reflect.Value) error {
 	}
 
 	buf := bytes.NewReader(data)
-	ktype := mtype.Key()
-	vtype := mtype.Elem()
 	for {
-		nkey, err := readValue(buf)
+		entry, err := readValue(buf)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
-		nval, err := readValue(buf)
-		if err == io.EOF {
-			return errors.New("missing map value")
-		} else if err != nil {
+		if err := unpackEntry(entry, val); err != nil {
 			return err
 		}
-
-		mkey := reflect.New(ktype)
-		if err := Unmarshal(nkey, mkey.Interface()); err != nil {
-			return fmt.Errorf("decoding map key: %w", err)
-		}
-		mval := reflect.New(vtype)
-		if err := Unmarshal(nval, mval.Interface()); err != nil {
-			return fmt.Errorf("decoding map value: %w", err)
-		}
-		val.Elem().SetMapIndex(mkey.Elem(), mval.Elem())
 	}
 	return nil
 }
@@ -234,35 +261,51 @@ func unmarshalStruct(data []byte, val reflect.Value) error {
 			continue // skip unknown fields
 		}
 
-		// Non-slice.
-		if !fi.slice {
+		// Non-sequence.
+		if !fi.seq {
 			if err := Unmarshal(data, fi.target); err != nil {
 				return nil
 			}
 			continue
 		}
 		slc := reflect.ValueOf(fi.target)
+		kind := slc.Type().Elem().Kind()
 
-		// Packed array.
+		// Unpacked sequence element
+		// Packed sequence.
 		if fi.pack {
-			if err := unmarshalSlice(data, slc); err != nil {
+			switch kind {
+			case reflect.Slice:
+				err = unmarshalSlice(data, slc)
+			case reflect.Map:
+				err = unmarshalMap(data, slc)
+			}
+			if err != nil {
 				return err
 			}
 			continue
 		}
 
-		// Inline slice element.
-		if slc.IsNil() {
-			slc.Set(reflect.New(slc.Elem().Type()))
+		// Inline sequence element
+		switch kind {
+		case reflect.Map:
+			if err := unpackEntry(data, slc); err != nil {
+				return err
+			}
+
+		case reflect.Slice:
+			if slc.IsNil() {
+				slc.Set(reflect.New(slc.Elem().Type()))
+			}
+			elt, isPtr := newElement(slc.Elem().Type().Elem())
+			if err := Unmarshal(data, elt.Interface()); err != nil {
+				return err
+			}
+			if !isPtr {
+				elt = elt.Elem()
+			}
+			slc.Elem().Set(reflect.Append(slc.Elem(), elt))
 		}
-		elt, isPtr := newElement(slc.Elem().Type().Elem())
-		if err := Unmarshal(data, elt.Interface()); err != nil {
-			return err
-		}
-		if !isPtr {
-			elt = elt.Elem()
-		}
-		slc.Elem().Set(reflect.Append(slc.Elem(), elt))
 	}
 	return nil
 }
