@@ -138,9 +138,9 @@ func marshalSlice(val reflect.Value) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var buf bytes.Buffer
+	buf := newBufSize(encodedSize(vals))
 	for _, elt := range vals {
-		writeValue(&buf, elt)
+		writeValue(buf, elt)
 	}
 	return buf.Bytes(), nil
 }
@@ -176,17 +176,17 @@ func marshalMap(val reflect.Value) ([]byte, error) {
 func packMap(val reflect.Value) ([][]byte, error) {
 	var vals [][]byte
 	for _, key := range val.MapKeys() {
-		var buf bytes.Buffer
-		if bits, err := Marshal(key.Interface()); err != nil {
+		kbits, err := Marshal(key.Interface())
+		if err != nil {
 			return nil, err
-		} else {
-			writeValue(&buf, bits)
 		}
-		if bits, err := Marshal(val.MapIndex(key).Interface()); err != nil {
+		vbits, err := Marshal(val.MapIndex(key).Interface())
+		if err != nil {
 			return nil, err
-		} else {
-			writeValue(&buf, bits)
 		}
+		buf := newBufSize(lengthSize(kbits) + len(kbits) + lengthSize(vbits) + len(vbits))
+		writeValue(buf, kbits)
+		writeValue(buf, vbits)
 		vals = append(vals, buf.Bytes())
 	}
 	return vals, nil
@@ -301,4 +301,16 @@ func parseTag(s string) (fieldInfo, bool) {
 		}
 	}
 	return fi, true
+}
+
+func encodedSize(data [][]byte) int {
+	var size int
+	for _, buf := range data {
+		size += lengthSize(buf) + len(buf)
+	}
+	return size
+}
+
+func newBufSize(n int) *bytes.Buffer {
+	return bytes.NewBuffer(make([]byte, 0, n))
 }

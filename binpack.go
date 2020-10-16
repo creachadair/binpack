@@ -72,6 +72,7 @@ func NewBuffer(buf []byte) *Buffer {
 // ensure all buffered output is written to the underlying writer.
 type Encoder struct {
 	buf   io.Writer
+	grow  func(int)
 	flush func() error
 }
 
@@ -81,13 +82,15 @@ func NewEncoder(w io.Writer) *Encoder {
 	switch t := w.(type) {
 	case *bytes.Buffer:
 		enc.buf = t
-		enc.flush = func() error { return nil }
+		enc.grow = t.Grow
 	case *bufio.Writer:
 		enc.buf = t
+		enc.grow = func(int) {}
 		enc.flush = t.Flush
 	default:
 		buf := bufio.NewWriter(w)
 		enc.buf = buf
+		enc.grow = func(int) {}
 		enc.flush = buf.Flush
 	}
 	return &enc
@@ -95,6 +98,7 @@ func NewEncoder(w io.Writer) *Encoder {
 
 // Encode appends a single tag-value pair to the output.
 func (e *Encoder) Encode(tag int, value []byte) error {
+	e.grow(tagSize(tag) + lengthSize(value) + len(value))
 	err := writeTag(e.buf, tag)
 	if err == nil {
 		err = writeValue(e.buf, value)
@@ -103,7 +107,12 @@ func (e *Encoder) Encode(tag int, value []byte) error {
 }
 
 // Flush flushes buffered data to the underlying writer.
-func (e *Encoder) Flush() error { return e.flush() }
+func (e *Encoder) Flush() error {
+	if e.flush != nil {
+		return e.flush()
+	}
+	return nil
+}
 
 // tagSize returns the number of bytes needed to encode tag, or -1.
 func tagSize(tag int) int {
