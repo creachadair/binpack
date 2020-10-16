@@ -71,7 +71,7 @@ func NewBuffer(buf []byte) *Buffer {
 // Call the Encode method to add values. You must call Flush when finished to
 // ensure all buffered output is written to the underlying writer.
 type Encoder struct {
-	buf   bufWriter
+	buf   io.Writer
 	flush func() error
 }
 
@@ -105,15 +105,10 @@ func (e *Encoder) Encode(tag int, value []byte) error {
 // Flush flushes buffered data to the underlying writer.
 func (e *Encoder) Flush() error { return e.flush() }
 
-type bufWriter interface {
-	io.Writer
-	io.ByteWriter
-}
-
 // writeTag appends the encoding of tag to w.
-func writeTag(w bufWriter, tag int) (err error) {
+func writeTag(w io.Writer, tag int) (err error) {
 	if tag < 128 {
-		return w.WriteByte(byte(tag))
+		_, err = w.Write([]byte{byte(tag)})
 	} else if tag < (1 << 14) {
 		_, err = w.Write([]byte{0x80 | byte(tag>>8), byte(tag & 0xff)})
 	} else if tag < (1 << 30) {
@@ -127,29 +122,24 @@ func writeTag(w bufWriter, tag int) (err error) {
 }
 
 // writeValue writes the encoding of value to w.
-func writeValue(w bufWriter, value []byte) error {
+func writeValue(w io.Writer, value []byte) error {
 	n := len(value)
 	if n == 1 && value[0] < 128 {
-		return w.WriteByte(value[0])
+		_, err := w.Write([]byte{value[0]})
+		return err
 	}
 	var err error
 	if n < (1 << 6) {
-		err = w.WriteByte(0x80 | byte(n))
-		if err == nil {
-			_, err = w.Write(value)
-		}
+		_, err = w.Write([]byte{0x80 | byte(n)})
 	} else if n < (1 << 13) {
 		_, err = w.Write([]byte{0xC0 | byte(n>>8), byte(n)})
-		if err == nil {
-			_, err = w.Write(value)
-		}
 	} else if n < (1 << 29) {
 		_, err = w.Write([]byte{0xE0 | byte(n>>24), byte(n >> 16), byte(n >> 8), byte(n)})
-		if err == nil {
-			_, err = w.Write(value)
-		}
 	} else {
 		return fmt.Errorf("value too big (%d bytes > %d)", len(value), 1<<29-1)
+	}
+	if err == nil {
+		_, err = w.Write(value)
 	}
 	return err
 }
