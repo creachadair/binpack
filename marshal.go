@@ -199,7 +199,7 @@ func marshalStruct(val reflect.Value) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	buf := NewBuffer(nil)
+	buf := NewEncoder(nil)
 
 	for _, fi := range info {
 		// Slice fields are flattened into the stream unless packed.

@@ -53,65 +53,30 @@ import (
 	"strings"
 )
 
-// A Buffer wraps encoder that writes to a byte buffer. The caller can recover
-// the byte buffer from the Data field.
-type Buffer struct {
-	Data *bytes.Buffer
-	*Encoder
-}
-
-// NewBuffer constructs a new Buffer with the given data as its initial contents.
-// A Buffer wraps an Encoder that writes to a byte buffer.
-func NewBuffer(buf []byte) *Buffer {
-	data := bytes.NewBuffer(nil)
-	return &Buffer{Data: data, Encoder: NewEncoder(data)}
-}
-
-// An Encoder encodes tag-value records to an io.Writer.
-// Call the Encode method to add values. You must call Flush when finished to
-// ensure all buffered output is written to the underlying writer.
+// An Encoder encodes tag-value records to a buffer.  Call the Encode method to
+// add values. The buffer can be recovered from the Data field.
 type Encoder struct {
-	buf   io.Writer
-	grow  func(int)
-	flush func() error
+	Data *bytes.Buffer
 }
 
-// NewEncoder constructs an Encoder that writes data to w.
-func NewEncoder(w io.Writer) *Encoder {
-	var enc Encoder
-	switch t := w.(type) {
-	case *bytes.Buffer:
-		enc.buf = t
-		enc.grow = t.Grow
-	case *bufio.Writer:
-		enc.buf = t
-		enc.grow = func(int) {}
-		enc.flush = t.Flush
-	default:
-		buf := bufio.NewWriter(w)
-		enc.buf = buf
-		enc.grow = func(int) {}
-		enc.flush = buf.Flush
+// NewEncoder constructs an Encoder that writes data to buf. If buf == nil, a
+// new empty buffer is allocated and can be retrieved from the Data field of
+// the Encoder.
+func NewEncoder(buf *bytes.Buffer) *Encoder {
+	if buf == nil {
+		buf = bytes.NewBuffer(nil)
 	}
-	return &enc
+	return &Encoder{Data: buf}
 }
 
 // Encode appends a single tag-value pair to the output.
 func (e *Encoder) Encode(tag int, value []byte) error {
-	e.grow(tagSize(tag) + lengthSize(value) + len(value))
-	err := writeTag(e.buf, tag)
+	e.Data.Grow(tagSize(tag) + lengthSize(value) + len(value))
+	err := writeTag(e.Data, tag)
 	if err == nil {
-		err = writeValue(e.buf, value)
+		err = writeValue(e.Data, value)
 	}
 	return err
-}
-
-// Flush flushes buffered data to the underlying writer.
-func (e *Encoder) Flush() error {
-	if e.flush != nil {
-		return e.flush()
-	}
-	return nil
 }
 
 // tagSize returns the number of bytes needed to encode tag, or -1.

@@ -23,16 +23,13 @@ func TestDecodeEmpty(t *testing.T) {
 func TestEncodeSeveral(t *testing.T) {
 	input := []string{"cogwheel", "kiss", "failure", "x"}
 
-	e := binpack.NewBuffer(nil)
+	e := binpack.NewEncoder(nil)
 
 	// Encode the inputs using their lengths as tags.
 	for _, s := range input {
 		if err := e.Encode(len(s), []byte(s)); err != nil {
 			t.Fatalf("Encode %q failed: %v", s, err)
 		}
-	}
-	if err := e.Flush(); err != nil {
-		t.Fatalf("Flush failed: %v", err)
 	}
 
 	// Verify the binary format is right (hand-constructed).
@@ -87,12 +84,9 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		e := binpack.NewBuffer(nil)
+		e := binpack.NewEncoder(nil)
 		if err := e.Encode(test.tag, []byte(test.value)); err != nil {
 			t.Errorf("Encode(%d, %q): unexpected error: %v", test.tag, capLen(test.value), err)
-			continue
-		} else if err := e.Flush(); err != nil {
-			t.Errorf("Flush: unexpected error: %v", err)
 			continue
 		}
 		got := e.Data.String()
