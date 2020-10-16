@@ -105,37 +105,65 @@ func (e *Encoder) Encode(tag int, value []byte) error {
 // Flush flushes buffered data to the underlying writer.
 func (e *Encoder) Flush() error { return e.flush() }
 
+// tagSize returns the number of bytes needed to encode tag, or -1.
+func tagSize(tag int) int {
+	if tag < 128 {
+		return 1
+	} else if tag < (1 << 14) {
+		return 2
+	} else if tag < (1 << 30) {
+		return 4
+	}
+	return -1
+}
+
 // writeTag appends the encoding of tag to w.
 func writeTag(w io.Writer, tag int) (err error) {
-	if tag < 128 {
+	switch tagSize(tag) {
+	case 1:
 		_, err = w.Write([]byte{byte(tag)})
-	} else if tag < (1 << 14) {
+	case 2:
 		_, err = w.Write([]byte{0x80 | byte(tag>>8), byte(tag & 0xff)})
-	} else if tag < (1 << 30) {
+	case 4:
 		_, err = w.Write([]byte{
 			0xC0 | byte(tag>>24), byte(tag >> 16), byte(tag >> 8), byte(tag),
 		})
-	} else {
+	default:
 		return fmt.Errorf("tag too big (%d > %d)", tag, 1<<30-1)
 	}
 	return
 }
 
+// lengthSize returns the number of bytes to encode the length of value, or -1.
+func lengthSize(value []byte) int {
+	n := len(value)
+	if n == 1 && value[0] < 128 {
+		return 0
+	} else if n < (1 << 6) {
+		return 1
+	} else if n < (1 << 13) {
+		return 2
+	} else if n < (1 << 29) {
+		return 4
+	}
+	return -1
+}
+
 // writeValue writes the encoding of value to w.
 func writeValue(w io.Writer, value []byte) error {
 	n := len(value)
-	if n == 1 && value[0] < 128 {
+	var err error
+	switch lengthSize(value) {
+	case 0:
 		_, err := w.Write([]byte{value[0]})
 		return err
-	}
-	var err error
-	if n < (1 << 6) {
+	case 1:
 		_, err = w.Write([]byte{0x80 | byte(n)})
-	} else if n < (1 << 13) {
+	case 2:
 		_, err = w.Write([]byte{0xC0 | byte(n>>8), byte(n)})
-	} else if n < (1 << 29) {
+	case 4:
 		_, err = w.Write([]byte{0xE0 | byte(n>>24), byte(n >> 16), byte(n >> 8), byte(n)})
-	} else {
+	default:
 		return fmt.Errorf("value too big (%d bytes > %d)", len(value), 1<<29-1)
 	}
 	if err == nil {
