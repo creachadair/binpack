@@ -213,18 +213,21 @@ func readValue(buf bufReader) ([]byte, error) {
 		return nil, err
 	}
 	var n int
-	switch v := b >> 5; v {
-	case 0, 1, 2, 3: // literal single-byte value
+	if v := b >> 5; v < 4 {
+		// index with 1-byte value; no additional data bytes
 		return []byte{b}, nil
-	case 4, 5: // length in index byte
+	} else if v < 6 {
+		// index + data
 		n = int(b & 0x3f)
-	case 6: // index + 2
+	} else if v == 6 {
+		// index + 2 + data
 		c, err := buf.ReadByte()
 		if err != nil {
 			return nil, err
 		}
 		n = int(b&0x1f)<<8 | int(c)
-	case 7: // 4 bytes after index
+	} else {
+		// index + 3 + data
 		n, err = readInt24(buf)
 		if err != nil {
 			return nil, err
