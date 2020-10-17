@@ -2,11 +2,11 @@
 
 // Package binpack implements a compact binary encoding format.
 //
-// A binpack message is a concatenated sequence of tag-value records. A tag is
-// an unsigned integer value, a value is an array of bytes. The tags and values
-// are opaque to the encoding; the caller must provide additional structure as
-// needed.  For example, the application may encode type information in some
-// low-order bits of the tag.
+// Structured data are represented in binpack as a concatenated sequence of
+// tag-value records. A tag is an unsigned integer value, a value is an array
+// of bytes. The tags and values are opaque to the encoding; the caller must
+// provide additional structure as needed.  For example, the application may
+// encode type information in some low-order bits of the tag.
 //
 // Tags are encoded as 1, 2, or 4 bytes, having values up to 2^30-1.  Values
 // are length-prefixed byte arrays up to 2^29-1 bytes in length.
