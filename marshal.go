@@ -5,7 +5,6 @@ package binpack
 import (
 	"bytes"
 	"encoding"
-	"encoding/binary"
 	"fmt"
 	"math"
 	"reflect"
@@ -72,40 +71,30 @@ func Marshal(v interface{}) ([]byte, error) {
 // marshalNumber reports whether v is one of the built-in numeric types, apart
 // from byte and uint8; if so it also returns the encoding of v.
 func marshalNumber(v interface{}) (bool, []byte) {
-	var z uint64
 	switch t := v.(type) {
 	case uint16:
-		z = uint64(t)
+		return true, PackUint64(uint64(t))
 	case uint32:
-		z = uint64(t)
+		return true, PackUint64(uint64(t))
 	case uint64:
-		z = t
+		return true, PackUint64(t)
 	case int:
-		w := int64(t)
-		z = uint64(w<<1) ^ uint64(w>>63) // zigzag
+		return true, PackInt64(int64(t))
 	case int8:
-		z = uint64(t<<1) ^ uint64(t>>7) // zigzag
+		return true, PackInt64(int64(t))
 	case int16:
-		z = uint64(t<<1) ^ uint64(t>>15) // zigzag
+		return true, PackInt64(int64(t))
 	case int32:
-		z = uint64(t<<1) ^ uint64(t>>31) // zigzag
+		return true, PackInt64(int64(t))
 	case int64:
-		z = uint64(t<<1) ^ uint64(t>>63) // zigzag
+		return true, PackInt64(int64(t))
 	case float32:
-		z = uint64(math.Float32bits(t))
+		return true, PackUint64(uint64(math.Float32bits(t)))
 	case float64:
-		z = math.Float64bits(t)
+		return true, PackUint64(math.Float64bits(t))
 	default:
 		return false, nil
 	}
-	var buf [8]byte
-	binary.BigEndian.PutUint64(buf[:], z)
-	for i, b := range buf {
-		if b != 0 {
-			return true, buf[i:]
-		}
-	}
-	return true, buf[:1]
 }
 
 // deref reports whether v is nil pointer.  If v a non-nil pointer, it returns

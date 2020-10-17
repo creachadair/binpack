@@ -48,6 +48,7 @@ package binpack
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"strings"
@@ -250,4 +251,23 @@ func readInt24(buf bufReader) (int, error) {
 		return 0, err
 	}
 	return int(data[0])<<16 | int(data[1])<<8 | int(data[2]), nil
+}
+
+// PackUint64 encodes z as a slice in big-endian order, omitting leading zeroes.
+func PackUint64(z uint64) []byte {
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], z)
+	for i, b := range buf {
+		if b != 0 {
+			return buf[i:]
+		}
+	}
+	return buf[:1]
+}
+
+// PackInt64 encodes z as a slice in big-endian order with zigzg encoding,
+// omitting leading zeroes.
+func PackInt64(z int64) []byte {
+	u := uint64(z<<1) ^ uint64(z>>63)
+	return PackUint64(u)
 }
