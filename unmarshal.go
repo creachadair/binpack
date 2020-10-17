@@ -85,37 +85,33 @@ func oneByte(data []byte) (byte, bool) {
 // numeric types, apart from byte and uint8; if so it also populates v with the
 // decoding.
 func unmarshalNumber(data []byte, v interface{}) (bool, error) {
-	var z uint64
-	for _, b := range data {
-		z = (z << 8) | uint64(b)
-	}
-	mask := math.MaxUint64 + (1 - z&1)
-
 	switch t := v.(type) {
 	case *uint16:
-		*t = uint16(z)
+		*t = uint16(UnpackUint64(data))
 	case *uint32:
-		*t = uint32(z)
+		*t = uint32(UnpackUint64(data))
 	case *uint64:
-		*t = uint64(z)
+		*t = uint64(UnpackUint64(data))
 	case *int:
-		w := int64(mask ^ z>>1)
-		*t = int(w)
+		*t = int(UnpackInt64(data))
 	case *int8:
-		*t = int8(mask ^ z>>1)
+		*t = int8(UnpackInt64(data))
 	case *int16:
-		*t = int16(mask ^ z>>1)
+		*t = int16(UnpackInt64(data))
 	case *int32:
-		*t = int32(mask ^ z>>1)
+		*t = int32(UnpackInt64(data))
 	case *int64:
-		*t = int64(mask ^ z>>1)
+		*t = int64(UnpackInt64(data))
 	case *float32:
-		*t = math.Float32frombits(uint32(z))
+		*t = math.Float32frombits(uint32(UnpackUint64(data)))
 	case *float64:
-		*t = math.Float64frombits(z)
+		*t = math.Float64frombits(UnpackUint64(data))
 	default:
 		return false, nil
 	}
+
+	// N.B. We don't do this check till we know the target was actually a
+	// numeric type, since this might be fine for some other value.
 	if len(data) == 0 || len(data) > 8 {
 		return true, errors.New("invalid number encoding")
 	}

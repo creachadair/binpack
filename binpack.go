@@ -51,6 +51,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 )
 
@@ -254,6 +255,7 @@ func readInt24(buf bufReader) (int, error) {
 }
 
 // PackUint64 encodes z as a slice in big-endian order, omitting leading zeroes.
+// The encoding of 0 is a slice of length 1.
 func PackUint64(z uint64) []byte {
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], z)
@@ -265,9 +267,25 @@ func PackUint64(z uint64) []byte {
 	return buf[:1]
 }
 
+// UnpackUint64 decodes z from a big-endian slice.
+func UnpackUint64(data []byte) uint64 {
+	var z uint64
+	for _, b := range data {
+		z = (z << 8) | uint64(b)
+	}
+	return z
+}
+
 // PackInt64 encodes z as a slice in big-endian order with zigzg encoding,
-// omitting leading zeroes.
+// omitting leading zeroes. The encoding of 0 is a slice of length 1.
 func PackInt64(z int64) []byte {
 	u := uint64(z<<1) ^ uint64(z>>63)
 	return PackUint64(u)
+}
+
+// UnpackInt64 decodes z from a big-endian slice with zigzag encoding.
+func UnpackInt64(data []byte) int64 {
+	z := UnpackUint64(data)
+	mask := math.MaxUint64 + (1 - z&1)
+	return int64(mask ^ z>>1)
 }
