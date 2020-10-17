@@ -276,8 +276,11 @@ func UnpackUint64(data []byte) uint64 {
 	return z
 }
 
-// PackInt64 encodes z as a slice in big-endian order with zigzg encoding,
+// PackInt64 encodes z as a slice in big-endian order with zigzag encoding,
 // omitting leading zeroes. The encoding of 0 is a slice of length 1.
+//
+// Zigzag encoding represents a signed value as the bitwise complement of its
+// 2s complement value, with its sign in the least-significant bit.
 func PackInt64(z int64) []byte {
 	u := uint64(z<<1) ^ uint64(z>>63)
 	return PackUint64(u)
