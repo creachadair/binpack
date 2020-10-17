@@ -12,21 +12,13 @@ import (
 	"reflect"
 )
 
-// An Unmarshaler decodes a binpack value into the receiver.
-type Unmarshaler interface {
-	UnmarshalBinpack([]byte) error
-}
-
 // Unmarshal decodes data from binpack format into v.
-// If v implements Unmarshaler, its UnmarshalBinpack method is called.
-// Otherwise, if v implements encoding.BinaryUnmarshaler, that method is used.
+// If v implements encoding.BinaryUnmarshaler, that method is called.
 //
 // Because the binpack format does not record type information, unmarshaling
 // into an untyped interface will produce the input data unmodified.
 func Unmarshal(data []byte, v interface{}) error {
 	switch t := v.(type) {
-	case Unmarshaler:
-		return t.UnmarshalBinpack(data)
 	case encoding.BinaryUnmarshaler:
 		return t.UnmarshalBinary(data)
 	case *byte:
