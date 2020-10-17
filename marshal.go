@@ -21,14 +21,19 @@ import (
 //
 //     binpack:"tag=n"
 //
-// where n is an unsigned integer value. Zero-valued fields are not encoded.
-// Fields of slice types other than []byte are encoded inline, unless the
-// "pack" attribute is also set, for example:
+// where n is an unsigned integer value. Fields without tags are skipped, and
+// zero-valued fields are not encoded.
+//
+// Slices are marshaled as the concatenation of their contents. A struct field
+// of slice type other than []byte is encoded inline, meaning each slice
+// element is written as a separate tag-value pair within the struct. To
+// marshal slice fields in the concatenated format, use the "pack" attribute
+// in the field tag:
 //
 //     Names []string `binpack:"tag=24,pack"`
 //
-// When "pack" is set, the slice is instead packed into a single value.  This
-// generally makes sense for small values.
+// This generally makes sense for slices whose values are and lengths are
+// expected to be small.
 //
 // Note that map values are encoded in iteration order, which means that
 // marshaling a value that is or contains a map may not be deterministic.
