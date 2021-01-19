@@ -11,7 +11,7 @@
 // Tags are encoded as 1, 2, or 4 bytes, having values up to 2^30-1.  Values
 // are length-prefixed byte arrays up to 2^29-1 bytes in length.
 //
-// The enoding of a tag is as follows:
+// The encoding of a tag is as follows:
 //
 //   Byte 0 (index)
 //   +---------------+
@@ -43,6 +43,14 @@
 // encoded directly with a prefix of 0; otherwise the length is 1, 2, or 4
 // bytes.
 //
+// Primitive Types
+//
+// Integer types are sign-extended to 64 bits and encoded using PackUint64 or
+// PackInt64 as appropriate.
+//
+// Floating-point values are converted to binary using math.Float64bits or
+// math.Float32bits as appropriate, and the resulting bits are encoded as
+// integers.
 package binpack
 
 import (
