@@ -26,14 +26,7 @@ import (
 //
 // Slices are marshaled as the concatenation of their contents. A struct field
 // of slice type other than []byte is encoded inline, meaning each slice
-// element is written as a separate tag-value pair within the struct. To
-// marshal slice fields in the concatenated format, use the "pack" attribute
-// in the field tag:
-//
-//     Names []string `binpack:"tag=24,pack"`
-//
-// This generally makes sense for slices whose values are and lengths are
-// expected to be small.
+// element is written as a separate tag-value pair within the struct.
 //
 // Note that map values are encoded in iteration order, which means that
 // marshaling a value that is or contains a map may not be deterministic.
@@ -187,8 +180,8 @@ func marshalStruct(val reflect.Value) ([]byte, error) {
 	buf := NewEncoder(nil)
 
 	for _, fi := range info {
-		// Slice fields are flattened into the stream unless packed.
-		if fi.seq && !fi.pack {
+		// Slice fields are flattened into the stream.
+		if fi.seq {
 			var vals [][]byte
 			switch fi.target.Kind() {
 			case reflect.Slice:
@@ -263,9 +256,8 @@ func checkStructType(val reflect.Value, withPointer bool) ([]*fieldInfo, error) 
 }
 
 type fieldInfo struct {
-	tag  int  // field tag
-	seq  bool // value is a sequence (slice or map)
-	pack bool // use packed encoding
+	tag int  // field tag
+	seq bool // value is a sequence (slice or map)
 
 	// The field value, if withPointer=false (marshal).
 	// A pointer to the field value, if withPointer=true (unmarshal).
@@ -275,9 +267,7 @@ type fieldInfo struct {
 func parseTag(s string) (fieldInfo, bool) {
 	var fi fieldInfo
 	for _, arg := range strings.Split(s, ",") {
-		if arg == "pack" {
-			fi.pack = true
-		} else if strings.HasPrefix(arg, "tag=") {
+		if strings.HasPrefix(arg, "tag=") {
 			v, err := strconv.Atoi(arg[4:])
 			if err != nil {
 				return fi, false

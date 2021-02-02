@@ -267,20 +267,6 @@ func unmarshalStruct(data []byte, val reflect.Value) error {
 		slc := fi.target
 		kind := slc.Type().Elem().Kind()
 
-		// Packed sequence.
-		if fi.pack {
-			switch kind {
-			case reflect.Slice:
-				err = unmarshalSlice(data, slc)
-			case reflect.Map:
-				err = unmarshalMap(data, slc)
-			}
-			if err != nil {
-				return err
-			}
-			continue
-		}
-
 		// Inline sequence element
 		switch kind {
 		case reflect.Map:

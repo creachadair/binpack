@@ -191,36 +191,3 @@ func TestMarshalRoundTrip(t *testing.T) {
 		t.Errorf("Unmarshal output differs (-want, +got):\n%s", diff)
 	}
 }
-
-func TestUnmarshalPacked(t *testing.T) {
-	// This input mixes packed and unpacked values. Verify that the decoding
-	// them correctly combines the two forms.
-	//
-	//              /-- unpacked values--\ /-- packed values -\/------ map entry ------\
-	//             [  1   ][  2   ][  3   ][         4   5   6][     "xoxo":true       ]
-	const input = "\x0A\x02\x0A\x04\x0A\x06\x0A\x83\x08\x0A\x0C\x14\x87\x86\x84xoxo\x01" +
-		"\x14\x8e\x85\x83tla\x00\x87\x85heart\x00"
-	// packed:  [ "tla":false ][ "heart":false  ]
-
-	type test struct {
-		V []int           `binpack:"tag=10,pack"`
-		M map[string]bool `binpack:"tag=20,pack"`
-	}
-
-	var got test
-	if err := binpack.Unmarshal([]byte(input), &got); err != nil {
-		t.Fatalf("Unmarshal failed: %v", err)
-	}
-
-	want := test{
-		V: []int{1, 2, 3, 4, 5, 6},
-		M: map[string]bool{
-			"xoxo":  true,
-			"heart": false,
-			"tla":   false,
-		},
-	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("Unmarshal output (-want, +got):\n%s", diff)
-	}
-}
