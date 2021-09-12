@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"reflect"
 )
 
@@ -103,9 +102,9 @@ func unmarshalNumber(data []byte, v interface{}) (bool, error) {
 	case *int64:
 		*t = int64(UnpackInt64(data))
 	case *float32:
-		*t = math.Float32frombits(uint32(UnpackUint64(data)))
+		*t = UnpackFloat32(data)
 	case *float64:
-		*t = math.Float64frombits(UnpackUint64(data))
+		*t = UnpackFloat64(data)
 	default:
 		return false, nil
 	}

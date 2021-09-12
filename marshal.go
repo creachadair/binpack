@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding"
 	"fmt"
-	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -87,9 +86,9 @@ func marshalNumber(v interface{}) (bool, []byte) {
 	case int64:
 		return true, PackInt64(int64(t))
 	case float32:
-		return true, PackUint64(uint64(math.Float32bits(t)))
+		return true, PackFloat32(t)
 	case float64:
-		return true, PackUint64(math.Float64bits(t))
+		return true, PackFloat64(t)
 	default:
 		return false, nil
 	}

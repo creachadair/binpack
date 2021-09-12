@@ -300,3 +300,19 @@ func UnpackInt64(data []byte) int64 {
 	mask := math.MaxUint64 + (1 - z&1)
 	return int64(mask ^ z>>1)
 }
+
+// PackFloat64 encodes v by converting it to a uint64 in IEEE 754
+// representation and encoding that value as PackUint64.
+func PackFloat64(v float64) []byte { return PackUint64(math.Float64bits(v)) }
+
+// UnpackFloat64 decodes data as a uint64 in IEEE 754 representation, and
+// converts that representation back to a float64.
+func UnpackFloat64(data []byte) float64 { return math.Float64frombits(UnpackUint64(data)) }
+
+// PackFloat32 encodes v by converting it to a uint64 in IEEE 754
+// representation and encoding that value as PackUint64.
+func PackFloat32(v float32) []byte { return PackUint64(uint64(math.Float32bits(v))) }
+
+// UnpackFloat32 decodes data as a uint64 in IEEE 754 representation, and
+// converts that representation back to a float32.
+func UnpackFloat32(data []byte) float32 { return math.Float32frombits(uint32(UnpackUint64(data))) }
