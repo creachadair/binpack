@@ -5,6 +5,7 @@ package binpack
 import (
 	"bytes"
 	"encoding"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -12,8 +13,9 @@ import (
 	"strings"
 )
 
-// Marshal encodes v as a binary value for a binpack tag-value pair.
-// if v implements encoding.BinaryMarshaler, that method is called.
+// Marshal encodes a value v of struct type as a buffer of binpack tag-value
+// pairs.  if v implements encoding.BinaryMarshaler, that method is called.
+// Marshal reports an error if v is not a struct or pointer to a struct.
 //
 // For struct types, Marshal uses field tags to select which exported fields
 // should be included and to assign them tag values. The tag format is:
@@ -31,6 +33,17 @@ import (
 // marshaling a value that is or contains a map may not be deterministic.
 // Other than maps, however, the output is deterministic.
 func Marshal(v interface{}) ([]byte, error) {
+	typ := reflect.TypeOf(v)
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	if typ.Kind() != reflect.Struct {
+		return nil, errors.New("v is not a struct or pointer to struct")
+	}
+	return marshalAny(v)
+}
+
+func marshalAny(v interface{}) ([]byte, error) {
 	switch t := v.(type) {
 	case encoding.BinaryMarshaler:
 		return t.MarshalBinary()
@@ -128,7 +141,7 @@ func packSlice(val reflect.Value) ([][]byte, error) {
 	var vals [][]byte
 	for i := 0; i < val.Len(); i++ {
 		cur := val.Index(i).Interface()
-		data, err := Marshal(cur)
+		data, err := marshalAny(cur)
 		if err != nil {
 			return nil, fmt.Errorf("marshaling index %d: %w", i, err)
 		}
@@ -153,11 +166,11 @@ func marshalMap(val reflect.Value) ([]byte, error) {
 func packMap(val reflect.Value) ([][]byte, error) {
 	var vals [][]byte
 	for _, key := range val.MapKeys() {
-		kbits, err := Marshal(key.Interface())
+		kbits, err := marshalAny(key.Interface())
 		if err != nil {
 			return nil, err
 		}
-		vbits, err := Marshal(val.MapIndex(key).Interface())
+		vbits, err := marshalAny(val.MapIndex(key).Interface())
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +210,7 @@ func marshalStruct(val reflect.Value) ([]byte, error) {
 				buf.Encode(fi.tag, elt)
 			}
 			continue
-		} else if data, err := Marshal(fi.target.Interface()); err != nil {
+		} else if data, err := marshalAny(fi.target.Interface()); err != nil {
 			return nil, err
 		} else {
 			buf.Encode(fi.tag, data)
