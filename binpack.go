@@ -13,37 +13,37 @@
 //
 // The encoding of a tag is as follows:
 //
-//   Byte 0 (index)
-//   +---------------+
-//   |0|   7 bits    | + 0 bytes  : values 0..127 (7 bits)
-//   +---------------+
-//   |1|0| 6 bits    | + 1 byte   : values 0..16383 (14 bits)
-//   +---------------+
-//   |1|1| 6 bits    | + 3 bytes  : values 0..1073741823 (30 bits)
-//   +---------------+
+//	Byte 0 (index)
+//	+---------------+
+//	|0|   7 bits    | + 0 bytes  : values 0..127 (7 bits)
+//	+---------------+
+//	|1|0| 6 bits    | + 1 byte   : values 0..16383 (14 bits)
+//	+---------------+
+//	|1|1| 6 bits    | + 3 bytes  : values 0..1073741823 (30 bits)
+//	+---------------+
 //
 // The first byte of the tag is called the index, and its high-order two bits
 // determine the size of the tag in bytes (0_=1, 01=2, 11=4).
 //
 // The encoding of a value is as follows:
 //
-//   Byte 0 (index)
-//   +---------------+
-//   |0|   7 bits    | + 0 bytes         : length 1, value 0..127
-//   +---------------+
-//   |1|0| 6 bits    | + 0 bytes + data  : length 0..63
-//   +---------------+
-//   |1|1|0| 5 bits  | + 1 bytes + data  : length 0..8191
-//   +---------------+
-//   |1|1|1| 5 bits  | + 3 bytes + data  : length 0..536870911
-//   +---------------+
+//	Byte 0 (index)
+//	+---------------+
+//	|0|   7 bits    | + 0 bytes         : length 1, value 0..127
+//	+---------------+
+//	|1|0| 6 bits    | + 0 bytes + data  : length 0..63
+//	+---------------+
+//	|1|1|0| 5 bits  | + 1 bytes + data  : length 0..8191
+//	+---------------+
+//	|1|1|1| 5 bits  | + 3 bytes + data  : length 0..536870911
+//	+---------------+
 //
 // The first byte of the value is called the index, and its high-order three
 // bits determine the size of the length prefix. Small single-byte values are
 // encoded directly with a prefix of 0; otherwise the length is 1, 2, or 4
 // bytes.
 //
-// Primitive Types
+// # Primitive Types
 //
 // Integer types are sign-extended to 64 bits and encoded using PackUint64 or
 // PackInt64 as appropriate.

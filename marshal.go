@@ -20,7 +20,7 @@ import (
 // For struct types, Marshal uses field tags to select which exported fields
 // should be included and to assign them tag values. The tag format is:
 //
-//     binpack:"tag=n"
+//	binpack:"tag=n"
 //
 // where n is an unsigned integer value. Fields without tags are skipped, and
 // zero-valued fields are not encoded.
